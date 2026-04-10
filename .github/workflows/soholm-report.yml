@@ -80,14 +80,18 @@ jobs:
             FAILED_STEP="不明なステップ"
           fi
 
-          node scripts/soholm/send-report.js \
-            --subject "【エラー】スーホルム実績ツール 処理失敗" \
-            --body "スーホルム実績ツールでエラーが発生しました。
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          cat > /tmp/error-report.txt << BODY
+スーホルム実績ツールでエラーが発生しました。
 
 失敗箇所: ${FAILED_STEP}
-実行URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+実行URL: ${RUN_URL}
 
-GitHub Actionsのログを確認してください。"
+GitHub Actionsのログを確認してください。
+BODY
+          node scripts/soholm/send-report.js \
+            --subject "【エラー】スーホルム実績ツール 処理失敗" \
+            --body-file /tmp/error-report.txt
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
