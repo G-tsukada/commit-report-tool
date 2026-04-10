@@ -1,0 +1,94 @@
+name: スーホルム 実績レポート
+
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 毎日 22:00 UTC = 翌朝 07:00 JST
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: '対象日（YYYY-MM-DD、省略時は前日）'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        id: node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      - name: Fetch emails from Gmail
+        id: fetch
+        run: node scripts/soholm/fetch-emails.js
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+
+      - name: Read prompt file
+        id: read-prompt
+        run: |
+          {
+            echo 'content<<EOF'
+            cat .claude/prompts/soholm-report.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ steps.read-prompt.outputs.content }}
+          claude_args: "--allowedTools 'Bash,Read,Write'"
+          show_full_output: true
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+
+      - name: Notify failure by email
+        if: failure()
+        run: |
+          FAILED_STEP=""
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            FAILED_STEP="チェックアウト"
+          elif [[ "${{ steps.node.outcome }}" == "failure" ]]; then
+            FAILED_STEP="Node.jsセットアップ"
+          elif [[ "${{ steps.install.outcome }}" == "failure" ]]; then
+            FAILED_STEP="依存パッケージインストール"
+          elif [[ "${{ steps.fetch.outcome }}" == "failure" ]]; then
+            FAILED_STEP="Gmailメール取得"
+          elif [[ "${{ steps.claude.outcome }}" == "failure" ]]; then
+            FAILED_STEP="Claude処理"
+          else
+            FAILED_STEP="不明なステップ"
+          fi
+
+          node scripts/soholm/send-report.js \
+            --subject "【エラー】スーホルム実績ツール 処理失敗" \
+            --body "スーホルム実績ツールでエラーが発生しました。
+
+失敗箇所: ${FAILED_STEP}
+実行URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+GitHub Actionsのログを確認してください。"
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
