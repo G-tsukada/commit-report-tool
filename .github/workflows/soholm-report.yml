@@ -65,32 +65,23 @@ jobs:
       - name: Notify failure by email
         if: failure()
         run: |
-          FAILED_STEP=""
-          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
-            FAILED_STEP="チェックアウト"
-          elif [[ "${{ steps.node.outcome }}" == "failure" ]]; then
-            FAILED_STEP="Node.jsセットアップ"
-          elif [[ "${{ steps.install.outcome }}" == "failure" ]]; then
-            FAILED_STEP="依存パッケージインストール"
-          elif [[ "${{ steps.fetch.outcome }}" == "failure" ]]; then
-            FAILED_STEP="Gmailメール取得"
-          elif [[ "${{ steps.claude.outcome }}" == "failure" ]]; then
-            FAILED_STEP="Claude処理"
-          else
-            FAILED_STEP="不明なステップ"
-          fi
-
+          FAILED_STEP="不明なステップ"
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then FAILED_STEP="チェックアウト"; fi
+          if [[ "${{ steps.node.outcome }}" == "failure" ]]; then FAILED_STEP="Node.jsセットアップ"; fi
+          if [[ "${{ steps.install.outcome }}" == "failure" ]]; then FAILED_STEP="依存パッケージインストール"; fi
+          if [[ "${{ steps.fetch.outcome }}" == "failure" ]]; then FAILED_STEP="Gmailメール取得"; fi
+          if [[ "${{ steps.claude.outcome }}" == "failure" ]]; then FAILED_STEP="Claude処理"; fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          cat > /tmp/error-report.txt << BODY
-スーホルム実績ツールでエラーが発生しました。
-
-失敗箇所: ${FAILED_STEP}
-実行URL: ${RUN_URL}
-
-GitHub Actionsのログを確認してください。
-BODY
+          printf '%s\n' \
+            "スーホルム実績ツールでエラーが発生しました。" \
+            "" \
+            "失敗箇所: ${FAILED_STEP}" \
+            "実行URL: ${RUN_URL}" \
+            "" \
+            "GitHub Actionsのログを確認してください。" \
+            > /tmp/error-report.txt
           node scripts/soholm/send-report.js \
-            --subject "【エラー】スーホルム実績ツール 処理失敗" \
+            --subject "エラー: スーホルム実績ツール 処理失敗" \
             --body-file /tmp/error-report.txt
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
