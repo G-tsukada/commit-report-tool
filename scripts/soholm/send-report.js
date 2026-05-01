@@ -1,20 +1,15 @@
 /**
- * Gmail OAuth2でレポートメールを送信する
+ * Gmail API でレポートメールを送信する
  *
  * 使い方:
  *   node scripts/soholm/send-report.js \
- *     --subject "【実績集計】スーホルム 2026-04-10" \
+ *     --subject "【実績集計】スーホルム 2026-04-30" \
  *     --body-file /tmp/soholm-report.txt
  *
- * または本文を直接指定:
+ *   または本文を直接指定:
  *   node scripts/soholm/send-report.js \
  *     --subject "..." \
  *     --body "本文テキスト"
- *
- * HTMLメールにする場合は --html-file オプションを使用:
- *   node scripts/soholm/send-report.js \
- *     --subject "..." \
- *     --html-file /tmp/soholm-report.html
  *
  * 環境変数:
  *   GMAIL_CLIENT_ID      - Google OAuth2 クライアントID
@@ -22,11 +17,11 @@
  *   GMAIL_REFRESH_TOKEN  - OAuth2 リフレッシュトークン
  */
 
-const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 const fs = require('fs');
 
 const GMAIL_USER = 'season.s.call.m.g69@gmail.com';
-const SEND_TO = 'season.s.call.m.g69@gmail.com';
+const SEND_TO   = 'season.s.call.m.g69@gmail.com';
 
 function parseArgs(argv) {
   const args = {};
@@ -35,11 +30,9 @@ function parseArgs(argv) {
     if (arg.startsWith('--')) {
       const eqIdx = arg.indexOf('=');
       if (eqIdx !== -1) {
-        const key = arg.slice(2, eqIdx);
-        args[key] = arg.slice(eqIdx + 1);
+        args[arg.slice(2, eqIdx)] = arg.slice(eqIdx + 1);
       } else {
-        const key = arg.slice(2);
-        args[key] = argv[i + 1] || true;
+        args[arg.slice(2)] = argv[i + 1] || true;
         i++;
       }
     }
@@ -47,8 +40,27 @@ function parseArgs(argv) {
   return args;
 }
 
+function buildMimeMessage({ from, to, subject, text }) {
+  const mime = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(text).toString('base64'),
+  ].join('\r\n');
+
+  return Buffer.from(mime)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
 async function main() {
-  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientId     = process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
 
@@ -57,53 +69,39 @@ async function main() {
     process.exit(1);
   }
 
-  const args = parseArgs(process.argv);
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+  const args    = parseArgs(process.argv);
   const subject = args['subject'] || '【実績集計】スーホルム レポート';
 
-  let textBody = '';
-  let htmlBody = '';
-
+  let body = '';
   if (args['body-file']) {
-    textBody = fs.readFileSync(args['body-file'], 'utf-8');
+    body = fs.readFileSync(args['body-file'], 'utf-8');
   } else if (args['body']) {
-    textBody = args['body'];
+    body = args['body'];
   }
 
-  if (args['html-file']) {
-    htmlBody = fs.readFileSync(args['html-file'], 'utf-8');
-  }
-
-  if (!textBody && !htmlBody) {
-    console.error('ERROR: --body, --body-file, --html-file のいずれかを指定してください');
+  if (!body) {
+    console.error('ERROR: --body または --body-file を指定してください');
     process.exit(1);
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      type: 'OAuth2',
-      user: GMAIL_USER,
-      clientId,
-      clientSecret,
-      refreshToken,
-    },
-  });
-
-  const mailOptions = {
+  const raw = buildMimeMessage({
     from: `スーホルム実績ツール <${GMAIL_USER}>`,
     to: SEND_TO,
     subject,
-  };
+    text: body,
+  });
 
-  if (htmlBody) {
-    mailOptions.html = htmlBody;
-    if (textBody) mailOptions.text = textBody;
-  } else {
-    mailOptions.text = textBody;
-  }
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
 
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`メール送信完了: ${info.messageId}`);
+  console.log(`メール送信完了: ${res.data.id}`);
   console.log(`送信先: ${SEND_TO}`);
   console.log(`件名: ${subject}`);
 }
