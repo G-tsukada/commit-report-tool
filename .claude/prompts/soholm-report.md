@@ -43,10 +43,14 @@ node scripts/soholm/send-report.js \
 抽出したデータを使って、Node.js で `/tmp/soholm-report.html` を生成してください。
 
 **デザイン仕様**
-- 背景: `#0d0d1a`（ダークネイビー）
-- アクセントカラー: `#f59e0b`（アンバー）
-- カード背景: `#1a1a2e`
-- 本文テキスト: `#d1d5db`
+- ページ背景: `#ffffff`（白）
+- アクセントカラー: `#f59e0b`（アンバー・見出し・矢印・ヘッダーボーダー左線など）
+- カード背景: `#e4dfd4`（グレージュ）※ヘッダー・各店舗・TOTAL・TOPICS・NEXT ACTIONS のブロックすべて
+- メインテキスト: `#44403c` / `#292524`（見出しタイトル `#1c1917`）
+- ラベル・補足: `#78716c` / `#57534e`
+- 達成率バーのトラック（棒の裏）: `#c4bdb0`
+- TOPICS の店舗名ラベル: `#4338ca`（紫）／左ボーダー `#6366f1`
+- フッター区切り線: `#d6d0c4`
 - 最大幅: 620px、中央揃え
 - フォント: `-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif`
 - HTMLはインラインスタイルのみ使用すること（Gmail互換のため）
