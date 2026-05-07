@@ -40,16 +40,21 @@ function parseArgs(argv) {
   return args;
 }
 
-function buildMimeMessage({ from, to, subject, text }) {
+function buildMimeMessage({ from, to, subject, text, html }) {
+  const contentType = html
+    ? 'text/html; charset=UTF-8'
+    : 'text/plain; charset=UTF-8';
+  const body = html || text;
+
   const mime = [
     `From: ${from}`,
     `To: ${to}`,
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
+    `Content-Type: ${contentType}`,
     'Content-Transfer-Encoding: base64',
     '',
-    Buffer.from(text).toString('base64'),
+    Buffer.from(body).toString('base64'),
   ].join('\r\n');
 
   return Buffer.from(mime)
@@ -78,14 +83,18 @@ async function main() {
   const subject = args['subject'] || '【実績集計】スーホルム レポート';
 
   let body = '';
-  if (args['body-file']) {
+  let htmlBody = '';
+
+  if (args['html-file']) {
+    htmlBody = fs.readFileSync(args['html-file'], 'utf-8');
+  } else if (args['body-file']) {
     body = fs.readFileSync(args['body-file'], 'utf-8');
   } else if (args['body']) {
     body = args['body'];
   }
 
-  if (!body) {
-    console.error('ERROR: --body または --body-file を指定してください');
+  if (!body && !htmlBody) {
+    console.error('ERROR: --body / --body-file / --html-file のいずれかを指定してください');
     process.exit(1);
   }
 
@@ -94,6 +103,7 @@ async function main() {
     to: SEND_TO,
     subject,
     text: body,
+    html: htmlBody || undefined,
   });
 
   const res = await gmail.users.messages.send({
