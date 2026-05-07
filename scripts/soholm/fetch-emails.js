@@ -84,8 +84,8 @@ async function main() {
   const yesterdayDate = getYesterdayJST();
   const searchDate = yesterdayDate.replace(/-/g, '/');
 
-  // Gmail検索クエリ: 件名に実績報告 OR スーホルム OR SOHOLM を含む昨日以降のメール
-  const query = `subject:(実績報告 OR スーホルム OR SOHOLM) after:${searchDate}`;
+  // Gmail検索クエリ: 件名に実績報告 OR スーホルム OR SOHOLM OR soholm OR "SOHOLM CAFE" を含む昨日以降のメール
+  const query = `subject:(実績報告 OR スーホルム OR SOHOLM OR soholm OR "SOHOLM CAFE") after:${searchDate}`;
   console.log(`検索クエリ: ${query}`);
 
   const listRes = await gmail.users.messages.list({
